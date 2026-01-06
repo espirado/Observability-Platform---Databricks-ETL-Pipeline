@@ -24,10 +24,29 @@ Delta Lake Gold (Analytical)
 ClickHouse (Analytical Store)
 ```
 
+## Data Sources
+
+### LogHub - Real Production Logs
+**Primary Data Source**: [LogHub](https://github.com/logpai/loghub) - A collection of system log datasets for AI-driven log analytics
+
+**Available Datasets**:
+- **HDFS** (Hadoop) - 11M+ lines of distributed file system logs
+- **Spark** (Apache Spark) - 33K+ lines of data processing logs
+- **Zookeeper** - 74K+ lines of coordination service logs
+- **BGL** (Blue Gene/L) - 4.7M+ lines from supercomputer
+- **OpenStack** - 207K+ lines from cloud platform
+- **And 10+ more real production datasets**
+
+**Why LogHub?**
+- ✅ Real production logs (not synthetic)
+- ✅ Publicly available (no privacy issues)
+- ✅ Academic credibility (100+ research citations)
+- ✅ Perfect for DS-610 big data project
+
 ## Data Flow
 
 ### Bronze Layer (Raw Ingestion)
-- **Input**: JSON logs, OTel traces, Prometheus metrics
+- **Input**: LogHub datasets (HDFS, Spark, OpenStack, etc.) or JSON logs, OTel traces
 - **Output**: Partitioned Delta tables by date
 - **Processing**: Schema validation, deduplication
 - **Retention**: 30 days

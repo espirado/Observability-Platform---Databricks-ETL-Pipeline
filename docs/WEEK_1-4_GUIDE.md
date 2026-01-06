@@ -56,18 +56,44 @@ dbutils.fs.mkdirs(BASE_PATH)
 
 For production/university accounts, see [SETUP.md](SETUP.md) for S3/ADLS mount instructions.
 
-### Step 4: Generate Sample Data
+### Step 4: Get Real Production Logs from LogHub
 
-**Run Notebook 00**: `00_generate_sample_data.py`
+**Run Notebook 00**: `00_ingest_from_loghub.py`
+
+**LogHub** ([github.com/logpai/loghub](https://github.com/logpai/loghub)): A collection of real production system logs
+
+**Choose a dataset**:
+- **HDFS** (Recommended) - Hadoop distributed file system logs
+- **Spark** - Apache Spark data processing logs
+- **OpenStack** - Cloud platform logs
+- **BGL** - Blue Gene/L supercomputer logs
+- **And 10+ more**
+
+**Run it**:
+```python
+# In Databricks, set widget parameters:
+# - Dataset: HDFS
+# - Sample Size: 100000 (or 0 for all)
+
+%run /Workspace/observability-etl/00_ingest_from_loghub
+```
 
 This creates:
-- 100,000 synthetic log events
-- Realistic microservice trace patterns
-- 24 hours of time-series data
+- Real production logs from HDFS/Spark/etc.
+- Enhanced with observability metadata
+- Structured JSONL format
 
-**Output**: `/dbfs/observability-data/sample-logs/sample.jsonl`
+**Output**: `/dbfs/observability-data/loghub/HDFS_enhanced.jsonl`
 
-**Expected Runtime**: 2-3 minutes
+**Expected Runtime**: 3-5 minutes
+
+**Why LogHub?**
+- ✅ Real production data (not synthetic)
+- ✅ Academically credible (100+ citations)
+- ✅ Publicly available (no privacy issues)
+- ✅ Perfect for DS-610 research project
+
+**Alternative**: If you prefer synthetic data for testing, use `00_generate_sample_data.py`
 
 ### Week 1 Deliverable
 ✅ Databricks account created  
