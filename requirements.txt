@@ -1,0 +1,26 @@
+# Core Databricks libraries (pre-installed in Databricks Runtime)
+# These are for reference and local development only
+
+# Delta Lake
+delta-spark==2.4.0
+
+# ClickHouse client for export
+clickhouse-driver==0.2.6
+clickhouse-connect==0.6.19
+
+# Data validation
+pydantic==2.5.0
+
+# Testing
+pytest==7.4.3
+pytest-spark==0.6.0
+
+# Code quality
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
+

@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.log
+.env
+.venv
+env/
+venv/
+
+# Databricks
+.databricks/
+*.pyc
+.dbfs/
+
+# Secrets
+config/secrets.json
+*.pem
+*.key
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Data
+*.parquet
+*.csv
+*.jsonl
+data/
+
+# OS
+Thumbs.db
+
