@@ -29,7 +29,8 @@ import re
 import tarfile
 import urllib.request
 from datetime import datetime
-import sys
+import shutil
+from pathlib import Path
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -146,11 +147,40 @@ print(f"Loaded {len(df):,} Linux syslog events from LogHub.")
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 2) Build dashboard charts
+# MAGIC ## 2) Quick analytics (explore the dataset)
+
+# COMMAND ----------
+
+print("Date range:")
+print(f"  Start: {df['timestamp'].min()}")
+print(f"  End:   {df['timestamp'].max()}")
+
+print("\nTop 10 processes:")
+print(df["process"].value_counts().head(10))
+
+print("\nTop 10 hosts:")
+print(df["host"].value_counts().head(10))
+
+print("\nSeverity distribution:")
+print(df["severity"].value_counts())
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3) Build dashboard charts
 
 # COMMAND ----------
 
 output_dir = "/dbfs/observability-data/dashboard_video"
+try:
+    dbutils.widgets.text(
+        "repo_output_path",
+        "",
+        "Optional Repo Output Path (e.g., /Workspace/Repos/<user>/repo/outputs/dashboard_video)",
+    )
+    repo_output_path = dbutils.widgets.get("repo_output_path").strip()
+except Exception:
+    repo_output_path = ""
 slides_dir = os.path.join(output_dir, "slides")
 audio_dir = os.path.join(output_dir, "audio")
 
@@ -214,6 +244,11 @@ plt.savefig(dashboard_path, dpi=160)
 plt.close(fig)
 
 print(f"Saved dashboard: {dashboard_path}")
+if repo_output_path:
+    repo_dash = Path(repo_output_path) / "dashboard.png"
+    repo_dash.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(dashboard_path, repo_dash)
+    print(f"Copied dashboard to repo: {repo_dash}")
 
 # COMMAND ----------
 
@@ -315,6 +350,13 @@ for slide in slides:
     save_slide(slide["title"], slide["subtitle"], slide["chart"], slide["path"])
 
 print(f"Saved {len(slides)} slides to {slides_dir}")
+if repo_output_path:
+    repo_slides_dir = Path(repo_output_path) / "slides"
+    repo_slides_dir.mkdir(parents=True, exist_ok=True)
+    for slide in slides:
+        dest = repo_slides_dir / Path(slide["path"]).name
+        shutil.copy2(slide["path"], dest)
+    print(f"Copied slides to repo: {repo_slides_dir}")
 
 # COMMAND ----------
 
@@ -341,6 +383,13 @@ if gTTS is None:
     print("⚠️  gTTS not available. Narration audio will be skipped.")
 else:
     print(f"Generated narration audio in {audio_dir}")
+    if repo_output_path:
+        repo_audio_dir = Path(repo_output_path) / "audio"
+        repo_audio_dir.mkdir(parents=True, exist_ok=True)
+        for audio_file in audio_files:
+            if audio_file and os.path.exists(audio_file):
+                shutil.copy2(audio_file, repo_audio_dir / Path(audio_file).name)
+        print(f"Copied audio to repo: {repo_audio_dir}")
 
 # COMMAND ----------
 
@@ -380,53 +429,58 @@ else:
     if os.path.exists(final_path):
         file_size_mb = os.path.getsize(final_path) / (1024 * 1024)
         print(f"✓ Saved video: {final_path} ({file_size_mb:.2f} MB)")
+        if repo_output_path:
+            repo_video = Path(repo_output_path) / "dashboard_explainer.mp4"
+            repo_video.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(final_path, repo_video)
+            print(f"Copied video to repo: {repo_video}")
     else:
         print(f"⚠️  Video generated but not found at: {final_path}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 6) Download the video to your local machine
+# MAGIC ## 6) Copy all outputs into a repo folder (for GitHub)
 
 # COMMAND ----------
 
-# DBTITLE 1,Create Download Link
-import os
+if repo_output_path:
+    try:
+        dbutils.fs.cp(
+            f"dbfs:{output_dir}",
+            f"file:{repo_output_path}",
+            True,
+        )
+        print(f"✓ Copied all outputs into repo folder: {repo_output_path}")
+    except Exception as e:
+        print(f"✗ Failed to copy outputs to repo: {e}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 7) Copy outputs to Workspace for download
+
+# COMMAND ----------
+
+workspace_user = "aespira@saintpetersuniversity1.onmicrosoft.com"
+workspace_dir = f"/Workspace/Users/{workspace_user}"
 
 video_path = "/dbfs/observability-data/dashboard_video/dashboard_explainer.mp4"
-workspace_path = "/Workspace/Users/aespira@saintpetersuniversity1.onmicrosoft.com/dashboard_explainer.mp4"
+dashboard_path = "/dbfs/observability-data/dashboard_video/dashboard.png"
 
-if os.path.exists(video_path):
-    file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
-    
-    # Copy to Workspace folder for easy download
-    dbutils.fs.cp(
-        "dbfs:/observability-data/dashboard_video/dashboard_explainer.mp4",
-        f"file:{workspace_path}"
-    )
-    
-    print(f"✓ Video ready for download")
-    print(f"  File: dashboard_explainer.mp4")
-    print(f"  Size: {file_size_mb:.2f} MB")
-    print(f"\n📥 To download:")
-    print(f"  1. Go to Workspace in the left sidebar")
-    print(f"  2. Navigate to: Users → aespira@saintpetersuniversity1.onmicrosoft.com")
-    print(f"  3. Right-click 'dashboard_explainer.mp4'")
-    print(f"  4. Select 'Download'")
-    print(f"\n✓ Video copied to: {workspace_path}")
-else:
-    print(f"✗ Video file not found at: {video_path}")
-    print("Please run Cell 13 first to generate the video.")
+def copy_to_workspace(dbfs_path, filename):
+    if not os.path.exists(dbfs_path):
+        print(f"✗ Not found: {dbfs_path}")
+        return
+    file_size_mb = os.path.getsize(dbfs_path) / (1024 * 1024)
+    dbutils.fs.cp(f"dbfs:{dbfs_path}", f"file:{workspace_dir}/{filename}")
+    print(f"✓ Copied {filename} ({file_size_mb:.2f} MB) to {workspace_dir}")
 
-# COMMAND ----------
 
-# DBTITLE 1,Push Files to GitHub
-repo_output_path = "/Workspace/Users/aespira@saintpetersuniversity1.onmicrosoft.com/Observability-Platform---Databricks-ETL-Pipeline/job_results/dashboard_video"
+copy_to_workspace(video_path, "dashboard_explainer.mp4")
+copy_to_workspace(dashboard_path, "dashboard.png")
 
-dbutils.fs.cp(
-    "dbfs:/observability-data/dashboard_video",
-    f"file:{repo_output_path}",
-    True,
-)
-
-print("✓ Copied outputs to repo:", repo_output_path)
+print("\n📥 To download:")
+print("  1. Go to Workspace in the left sidebar")
+print(f"  2. Navigate to: Users → {workspace_user}")
+print("  3. Right-click the file and select 'Download'")
