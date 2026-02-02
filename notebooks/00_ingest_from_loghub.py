@@ -1,11 +1,11 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # 00: Ingest from LogHub (Real Production Logs)
-# MAGIC 
+# MAGIC
 # MAGIC **Source**: https://github.com/logpai/loghub
-# MAGIC 
+# MAGIC
 # MAGIC **LogHub**: A large collection of system log datasets for AI-driven log analytics
-# MAGIC 
+# MAGIC
 # MAGIC **Available Datasets**:
 # MAGIC - HDFS (Hadoop logs) - 11M+ lines
 # MAGIC - Spark (Apache Spark logs) - 33K+ lines
@@ -17,7 +17,7 @@
 # MAGIC - Linux - 120K+ lines
 # MAGIC - OpenStack - 207K+ lines
 # MAGIC - Apache - 56K+ lines
-# MAGIC 
+# MAGIC
 # MAGIC **Perfect for DS-610** because it's real production data used in academic research!
 
 # COMMAND ----------
@@ -151,7 +151,7 @@ except Exception as e:
 
 # MAGIC %md
 # MAGIC ## Parse LogHub Format
-# MAGIC 
+# MAGIC
 # MAGIC LogHub logs are typically in this format:
 # MAGIC ```
 # MAGIC <Date> <Time> <Pid> <Level> <Component>: <Content>
@@ -284,7 +284,7 @@ print(json.dumps(parsed_logs[0], indent=2))
 
 # MAGIC %md
 # MAGIC ## Add Observability Context
-# MAGIC 
+# MAGIC
 # MAGIC Enhance logs with microservice-like metadata for our use case
 
 # COMMAND ----------
@@ -383,21 +383,26 @@ print(f"✅ Wrote {len(enhanced_logs):,} logs to {output_file}")
 
 # COMMAND ----------
 
-# Read back with Spark
-df = spark.read.json(output_file)
+# Convert local path to DBFS path for Spark
+dbfs_path = output_file.replace("/dbfs/", "dbfs:/")
 
-print(f"📊 Validation:")
-print(f"   Total records: {df.count():,}")
-print(f"\nSchema:")
+df = spark.read.json(dbfs_path)
+
+# Validation
+display(df)
+
+# Show schema
 df.printSchema()
 
-print(f"\nSample records:")
-df.show(5, truncate=False)
+# Sample records
+display(df.limit(5))
 
-# Statistics
-print(f"\n📈 Statistics:")
-df.groupBy("level").count().show()
-df.groupBy("is_error").count().show()
+# Statistics by 'level'
+display(df.groupBy("level").count())
+
+# Only group by 'is_error' if it exists
+if "is_error" in df.columns:
+    display(df.groupBy("is_error").count())
 
 # COMMAND ----------
 

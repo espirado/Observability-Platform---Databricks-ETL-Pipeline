@@ -1,13 +1,13 @@
 # Databricks notebook source
 # MAGIC %md
 # MAGIC # 02: Enrich Events (Silver Layer)
-# MAGIC 
+# MAGIC
 # MAGIC **Purpose**: Parse and enrich Bronze logs into clean Silver events
-# MAGIC 
+# MAGIC
 # MAGIC **Input**: Delta Bronze table (`/mnt/observability/bronze/logs`)
-# MAGIC 
+# MAGIC
 # MAGIC **Output**: Delta Silver table (`/mnt/observability/silver/events`)
-# MAGIC 
+# MAGIC
 # MAGIC **Processing**:
 # MAGIC - Flatten nested JSON structures
 # MAGIC - Extract source/target services from trace context
@@ -43,13 +43,111 @@ print(f"Enriching events for date: {input_date}")
 
 # COMMAND ----------
 
-bronze_df = (spark.read
+from pyspark.sql import functions as F, Window
+from delta.tables import DeltaTable
+from datetime import datetime, timedelta
+
+# Configuration
+BRONZE_PATH = "/mnt/observability/bronze/logs"
+SILVER_PATH = "/mnt/observability/silver/events"
+METADATA_PATH = "/mnt/observability/metadata/services"
+
+# Get processing date
+try:
+    input_date = dbutils.widgets.get("input_date")
+except Exception:
+    input_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+    dbutils.widgets.text("input_date", input_date, "Input Date (YYYY-MM-DD)")
+
+print(f"Enriching events for date: {input_date}")
+
+# Check if Bronze path exists
+if not dbutils.fs.exists(BRONZE_PATH):
+    raise FileNotFoundError(f"Path does not exist: {BRONZE_PATH}")
+
+# Read Bronze logs for the input date
+bronze_df = (
+    spark.read
     .format("delta")
     .load(BRONZE_PATH)
-    .filter(F.col("partition_date") == input_date))
+    .filter(F.col("partition_date") == input_date)
+)
+display(bronze_df)
+print(f"Read {bronze_df.count():,} bronze records for {input_date}")
 
-initial_count = bronze_df.count()
-print(f"Read {initial_count:,} bronze records for {input_date}")
+# Flatten nested fields and parse columns
+flattened_df = (
+    bronze_df
+    .withColumn("service", F.coalesce(
+        F.col("service"),
+        F.col("serviceName"),
+        F.col("kubernetes.labels.app"),
+        F.lit("unknown")
+    ))
+    .withColumn("http_method", F.col("http.method"))
+    .withColumn("http_path", F.col("http.path"))
+    .withColumn("http_route", F.col("http.route"))
+    .withColumn("http_status", F.col("http.status_code"))
+    .withColumn("latency_ms", F.col("http.latency_ms"))
+    .withColumn("client_ip", F.col("http.client_ip"))
+    .withColumn("trace_id", F.col("trace.trace_id"))
+    .withColumn("span_id", F.col("trace.span_id"))
+    .withColumn("parent_span_id", F.col("trace.parent_span_id"))
+    .withColumn("k8s_cluster", F.col("kubernetes.cluster"))
+    .withColumn("k8s_namespace", F.col("kubernetes.namespace"))
+    .withColumn("k8s_pod", F.col("kubernetes.pod"))
+    .withColumn("k8s_container", F.col("kubernetes.container"))
+    .withColumn("user_id", F.col("business.user_id"))
+    .withColumn("order_id", F.col("business.order_id"))
+    .withColumn("event_timestamp", F.to_timestamp(F.col("timestamp"), "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'"))
+)
+display(flattened_df)
+print(f"Flattened {flattened_df.count():,} records")
+
+# Extract source and target services
+trace_window = Window.partitionBy("trace_id").orderBy("event_timestamp")
+service_flow_df = (
+    flattened_df
+    .withColumn("span_kind", F.when(F.col("parent_span_id").isNull(), F.lit("ROOT")).otherwise(F.lit("SPAN")))
+    .withColumn("target_service", F.when(F.col("http_status").isNotNull(), F.col("service")).otherwise(F.lit(None)))
+    .withColumn("source_service", F.lag("service", 1).over(trace_window))
+    .withColumn("source_service", F.coalesce(F.col("source_service"), F.lit("external")))
+    .withColumn("endpoint", F.coalesce(F.col("http_route"), F.col("http_path"), F.lit("/unknown")))
+)
+display(service_flow_df)
+
+service_calls_df = service_flow_df.filter(
+    (F.col("source_service").isNotNull()) &
+    (F.col("target_service").isNotNull()) &
+    (F.col("source_service") != F.col("target_service"))
+)
+display(service_calls_df)
+print(f"Extracted {service_calls_df.count():,} service-to-service calls")
+
+# Enrich with service metadata (if available)
+if dbutils.fs.exists(METADATA_PATH):
+    metadata_df = spark.read.format("delta").load(METADATA_PATH)
+    enriched_df = (
+        service_calls_df
+        .join(metadata_df, service_calls_df["service"] == metadata_df["service_name"], "left")
+    )
+    display(enriched_df)
+    print("Enriched with service metadata")
+else:
+    enriched_df = service_calls_df
+    print("Service metadata not found; skipping enrichment")
+
+# Write to Silver table
+(
+    enriched_df
+    .write
+    .format("delta")
+    .mode("overwrite")
+    .option("overwriteSchema", "true")
+    .partitionBy("partition_date")
+    .save(SILVER_PATH)
+)
+print(f"Silver table written to {SILVER_PATH}")
 
 # COMMAND ----------
 
@@ -101,7 +199,7 @@ print(f"Flattened {flattened_df.count():,} records")
 
 # MAGIC %md
 # MAGIC ## Extract Source and Target Services
-# MAGIC 
+# MAGIC
 # MAGIC Use trace parent/child relationships to determine service-to-service calls
 
 # COMMAND ----------
@@ -150,7 +248,7 @@ print(f"Extracted {service_calls_df.count():,} service-to-service calls")
 
 # MAGIC %md
 # MAGIC ## Enrich with Service Metadata
-# MAGIC 
+# MAGIC
 # MAGIC Join with service metadata table (team, oncall, version, etc.)
 
 # COMMAND ----------

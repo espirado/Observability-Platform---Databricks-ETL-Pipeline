@@ -12,25 +12,42 @@
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 2
+# MAGIC %pip install --upgrade gtts
+# MAGIC %pip install --upgrade moviepy
+# MAGIC %pip install --upgrade imageio imageio-ffmpeg
+# MAGIC
+# MAGIC # Restart Python to load newly installed packages
+# MAGIC dbutils.library.restartPython()
+
+# COMMAND ----------
+
+# DBTITLE 1,Cell 2b - Imports
 import os
 import glob
 import re
 import tarfile
 import urllib.request
 from datetime import datetime
+import sys
 
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Optional dependencies (used for narration/video)
+# Text-to-speech
 try:
-    import pyttsx3  # offline text-to-speech
+    from gtts import gTTS
+    print("✓ gTTS available")
 except Exception:
-    pyttsx3 = None
+    gTTS = None
+    print("✗ gTTS not available")
 
+# Video editing - moviepy 2.x uses different import paths
 try:
-    from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips
-except Exception:
+    from moviepy import ImageClip, AudioFileClip, concatenate_videoclips
+    print("✓ moviepy available (version 2.x)")
+except Exception as e:
+    print(f"✗ moviepy import failed: {e}")
     ImageClip = AudioFileClip = concatenate_videoclips = None
 
 # COMMAND ----------
@@ -40,6 +57,7 @@ except Exception:
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 4
 try:
     dbutils.widgets.text(
         "loghub_path",
@@ -77,14 +95,14 @@ if not log_files:
 
 lines = []
 for path in log_files:
-    with open(path, "r") as f:
+    with open(path, "r", encoding="latin-1") as f:
         lines.extend([line.strip() for line in f.readlines() if line.strip()])
 
 log_pattern = re.compile(
-    r"^(?P<month>\\w{3})\\s+(?P<day>\\d{1,2})\\s"
-    r"(?P<time>\\d{2}:\\d{2}:\\d{2})\\s"
-    r"(?P<host>\\S+)\\s"
-    r"(?P<process>[^\\[:]+)(?:\\[(?P<pid>\\d+)\\])?:\\s"
+    r"^(?P<month>\w{3})\s+(?P<day>\d{1,2})\s"
+    r"(?P<time>\d{2}:\d{2}:\d{2})\s"
+    r"(?P<host>\S+)\s"
+    r"(?P<process>[^\[:]+)(?:\[(?P<pid>\d+)\])?:\s"
     r"(?P<message>.*)$"
 )
 
@@ -132,7 +150,7 @@ print(f"Loaded {len(df):,} Linux syslog events from LogHub.")
 
 # COMMAND ----------
 
-output_dir = "outputs/dashboard_video"
+output_dir = "/dbfs/observability-data/dashboard_video"
 slides_dir = os.path.join(output_dir, "slides")
 audio_dir = os.path.join(output_dir, "audio")
 
@@ -305,13 +323,12 @@ print(f"Saved {len(slides)} slides to {slides_dir}")
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 10
 def speak_to_file(text, output_path):
-    if pyttsx3 is None:
+    if gTTS is None:
         return None
-    engine = pyttsx3.init()
-    engine.setProperty("rate", 165)
-    engine.save_to_file(text, output_path)
-    engine.runAndWait()
+    tts = gTTS(text=text, lang='en', slow=False)
+    tts.save(output_path)
     return output_path
 
 
@@ -320,8 +337,8 @@ for idx, slide in enumerate(slides, start=1):
     audio_path = os.path.join(audio_dir, f"slide_{idx}.mp3")
     audio_files.append(speak_to_file(slide["narration"], audio_path))
 
-if pyttsx3 is None:
-    print("⚠️  pyttsx3 not available. Narration audio will be skipped.")
+if gTTS is None:
+    print("⚠️  gTTS not available. Narration audio will be skipped.")
 else:
     print(f"Generated narration audio in {audio_dir}")
 
@@ -332,23 +349,84 @@ else:
 
 # COMMAND ----------
 
+# DBTITLE 1,Cell 13
 if ImageClip is None:
     print("⚠️  moviepy not available. Video will be skipped.")
 else:
     clips = []
     for idx, slide in enumerate(slides):
-        img_clip = ImageClip(slide["path"])
         audio_path = audio_files[idx]
         if audio_path and os.path.exists(audio_path):
             audio_clip = AudioFileClip(audio_path)
-            img_clip = img_clip.set_duration(audio_clip.duration + 0.5)
-            img_clip = img_clip.set_audio(audio_clip)
+            duration = audio_clip.duration + 0.5
+            img_clip = ImageClip(slide["path"], duration=duration)
+            img_clip = img_clip.with_audio(audio_clip)
         else:
-            img_clip = img_clip.set_duration(6)
+            img_clip = ImageClip(slide["path"], duration=6)
         clips.append(img_clip)
 
     final_video = concatenate_videoclips(clips, method="compose")
-    video_path = os.path.join(output_dir, "dashboard_explainer.mp4")
-    final_video.write_videofile(video_path, fps=24, audio_codec="aac")
+    
+    # Write to local temp path first
+    local_video_path = "/tmp/dashboard_explainer.mp4"
+    final_video.write_videofile(local_video_path, fps=24, audio_codec="aac")
+    
+    # Copy to DBFS
+    dbfs_video_path = "dbfs:/observability-data/dashboard_video/dashboard_explainer.mp4"
+    dbutils.fs.cp(f"file:{local_video_path}", dbfs_video_path, recurse=False)
+    
+    # Verify
+    final_path = "/dbfs/observability-data/dashboard_video/dashboard_explainer.mp4"
+    if os.path.exists(final_path):
+        file_size_mb = os.path.getsize(final_path) / (1024 * 1024)
+        print(f"✓ Saved video: {final_path} ({file_size_mb:.2f} MB)")
+    else:
+        print(f"⚠️  Video generated but not found at: {final_path}")
 
-    print(f"Saved video: {video_path}")
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 6) Download the video to your local machine
+
+# COMMAND ----------
+
+# DBTITLE 1,Create Download Link
+import os
+
+video_path = "/dbfs/observability-data/dashboard_video/dashboard_explainer.mp4"
+workspace_path = "/Workspace/Users/aespira@saintpetersuniversity1.onmicrosoft.com/dashboard_explainer.mp4"
+
+if os.path.exists(video_path):
+    file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
+    
+    # Copy to Workspace folder for easy download
+    dbutils.fs.cp(
+        "dbfs:/observability-data/dashboard_video/dashboard_explainer.mp4",
+        f"file:{workspace_path}"
+    )
+    
+    print(f"✓ Video ready for download")
+    print(f"  File: dashboard_explainer.mp4")
+    print(f"  Size: {file_size_mb:.2f} MB")
+    print(f"\n📥 To download:")
+    print(f"  1. Go to Workspace in the left sidebar")
+    print(f"  2. Navigate to: Users → aespira@saintpetersuniversity1.onmicrosoft.com")
+    print(f"  3. Right-click 'dashboard_explainer.mp4'")
+    print(f"  4. Select 'Download'")
+    print(f"\n✓ Video copied to: {workspace_path}")
+else:
+    print(f"✗ Video file not found at: {video_path}")
+    print("Please run Cell 13 first to generate the video.")
+
+# COMMAND ----------
+
+# DBTITLE 1,Push Files to GitHub
+repo_output_path = "/Workspace/Users/aespira@saintpetersuniversity1.onmicrosoft.com/Observability-Platform---Databricks-ETL-Pipeline/job_results/dashboard_video"
+
+dbutils.fs.cp(
+    "dbfs:/observability-data/dashboard_video",
+    f"file:{repo_output_path}",
+    True,
+)
+
+print("✓ Copied outputs to repo:", repo_output_path)
