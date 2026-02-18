@@ -77,16 +77,19 @@ ClickHouse (Analytical Store)
 observability-databricks/
 ├── README.md
 ├── notebooks/
-│   ├── 01_ingest_raw_logs.py          # Bronze: Raw log ingestion
-│   ├── 02_enrich_events.py            # Silver: Event enrichment
-│   ├── 03_build_flow_dataset.py       # Gold: Service flow analytics
-│   ├── 04_build_topology_dataset.py   # Gold: Infrastructure topology
-│   ├── 05_detect_anomalies.py         # Gold: ML anomaly detection
-│   ├── 06_sync_to_clickhouse.py       # Export to analytical store
-│   └── utils/
-│       ├── schema_definitions.py      # Delta Lake schemas
-│       ├── enrichment_functions.py    # UDFs for enrichment
-│       └── clickhouse_writer.py       # Bulk insert helpers
+│   ├── 00_generate_sample_data.py     # Pre-req: Synthetic data generator
+│   ├── 00_ingest_from_log_hub.py      # Pre-req: Enterprise log ingestion
+│   ├── 00_ingest_from_loghub.py       # Pre-req: LogHub academic dataset
+│   ├── 01_ingest_raw_logs.py          # Week 2: Bronze raw log ingestion
+│   ├── 02_enrich_events.py            # Week 3: Silver event enrichment
+│   ├── 03_build_flow_dataset.py       # Week 4: Gold service flow analytics
+│   ├── 04_hive_sql_analysis.py        # Week 3: Hive/SQL analytics
+│   ├── 06_anomaly_detection_mllib.py  # Week 6: MLlib anomaly detection
+│   ├── 07_log_parsing_with_rdds.py    # Week 7: RDD log parsing
+│   ├── 08_streaming_log_analysis.py   # Week 8: Structured Streaming
+│   ├── 09_nosql_log_storage.py        # Week 9: NoSQL/HBase patterns
+│   ├── 10_dashboard_video.py          # Bonus: Dashboard + narrated video
+│   └── 11_ai_dashboard_analytics.py   # Bonus: AI analytics + Data Copilot
 ├── jobs/
 │   ├── hourly_etl.json               # Hourly batch job config
 │   ├── streaming_critical.json       # Streaming job for alerts

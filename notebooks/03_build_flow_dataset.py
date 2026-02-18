@@ -278,23 +278,26 @@ summary.show(truncate=False)
 
 # COMMAND ----------
 
-# Validate: Sum of edge request_counts should equal total Silver events
+# Validate: Sum of edge request_counts should account for Silver events
+# Note: Not all Silver events become Gold edges (events without source/target
+# service pairs or self-calls are filtered out during aggregation)
 gold_total_requests = gold_table \
     .filter(F.col("partition_date") == input_date) \
-    .agg(F.sum("request_count")).collect()[0][0]
+    .agg(F.sum("request_count")).collect()[0][0] or 0
 
-silver_total_requests = initial_count
+silver_total_events = initial_count
 
 print("\n✅ Validation Check:")
-print(f"Silver total events:      {silver_total_requests:,}")
+print(f"Silver total events:       {silver_total_events:,}")
 print(f"Gold total requests (sum): {gold_total_requests:,}")
+print(f"Data reduction ratio:      {silver_total_events / max(edge_count, 1):.1f}x")
 
-if gold_total_requests == silver_total_requests:
-    print("✅ PASS: Aggregation preserved all events!")
+if gold_total_requests <= silver_total_events:
+    print("✅ PASS: Gold requests ≤ Silver events (expected - some events filtered during aggregation)")
+    coverage = (gold_total_requests / silver_total_events) * 100 if silver_total_events > 0 else 0
+    print(f"   Coverage: {coverage:.1f}% of Silver events aggregated into Gold edges")
 else:
-    diff = abs(gold_total_requests - silver_total_requests)
-    diff_pct = (diff / silver_total_requests) * 100
-    print(f"⚠️  Difference: {diff:,} events ({diff_pct:.2f}%)")
+    print("⚠️  WARNING: Gold requests exceed Silver events - check for duplicate writes")
 
 # COMMAND ----------
 
