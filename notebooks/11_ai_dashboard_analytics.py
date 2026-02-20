@@ -86,9 +86,9 @@ except ImportError:
     print("⚠️  Jinja2 not available — HTML report will use basic formatting")
 
 # ── Paths ──────────────────────────────────────────────────────────────
-GOLD_PATH       = "/mnt/observability/gold/service_flow_edges"
-SILVER_PATH     = "/mnt/observability/silver/events"
-ANOMALY_PATH    = "/mnt/observability/analytics/anomalies"
+GOLD_PATH       = "/observability-data/gold/service_flow_edges"
+SILVER_PATH     = "/observability-data/silver/events"
+ANOMALY_PATH    = "/observability-data/analytics/anomalies"
 OUTPUT_DIR      = "/dbfs/observability-data/ai_dashboard"
 SLIDES_DIR      = os.path.join(OUTPUT_DIR, "slides")
 AUDIO_DIR       = os.path.join(OUTPUT_DIR, "audio")

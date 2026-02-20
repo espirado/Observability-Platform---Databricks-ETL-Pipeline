@@ -4,9 +4,9 @@
 # MAGIC 
 # MAGIC **Purpose**: Aggregate Silver events into hourly service flow metrics
 # MAGIC 
-# MAGIC **Input**: Delta Silver table (`/mnt/observability/silver/events`)
+# MAGIC **Input**: Delta Silver table (`/observability-data/silver/events`)
 # MAGIC 
-# MAGIC **Output**: Delta Gold table (`/mnt/observability/gold/service_flow_edges`)
+# MAGIC **Output**: Delta Gold table (`/observability-data/gold/service_flow_edges`)
 # MAGIC 
 # MAGIC **Aggregations**:
 # MAGIC - Request counts per service edge
@@ -22,8 +22,8 @@ from delta.tables import DeltaTable
 from datetime import datetime, timedelta
 
 # Configuration
-SILVER_PATH = "/mnt/observability/silver/events"
-GOLD_PATH = "/mnt/observability/gold/service_flow_edges"
+SILVER_PATH = "/observability-data/silver/events"
+GOLD_PATH = "/observability-data/gold/service_flow_edges"
 
 # Get processing date
 try:

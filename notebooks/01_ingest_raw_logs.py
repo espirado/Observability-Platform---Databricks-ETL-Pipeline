@@ -2,13 +2,13 @@
 # MAGIC %md
 # MAGIC # 01: Ingest Raw Logs (Bronze Layer)
 # MAGIC 
-# MAGIC **Purpose**: Ingest raw JSON logs from S3/ADLS/GCS into Delta Lake Bronze layer
+# MAGIC **Purpose**: Ingest LogHub-enhanced JSONL logs into Delta Lake Bronze layer
 # MAGIC 
 # MAGIC **Input**: 
-# MAGIC - Cloud storage path: `s3://bucket/raw-logs/YYYY-MM-DD/*.jsonl`
-# MAGIC - Kafka topic: `observability.logs` (optional)
+# MAGIC - LogHub data: `/observability-data/loghub/*_enhanced.jsonl`
+# MAGIC - Source: https://github.com/logpai/loghub (downloaded by notebook 00)
 # MAGIC 
-# MAGIC **Output**: Delta table at `/mnt/observability/bronze/logs`
+# MAGIC **Output**: Delta table at `/observability-data/bronze/logs`
 # MAGIC 
 # MAGIC **Partitioning**: By `partition_date` (derived from timestamp)
 # MAGIC 
@@ -27,8 +27,8 @@ from delta.tables import DeltaTable
 from datetime import datetime, timedelta
 
 # Configuration
-BRONZE_PATH = "/mnt/observability/bronze/logs"
-RAW_LOGS_PATH = "s3://your-bucket/raw-logs"  # Override with widget parameter
+BRONZE_PATH = "/observability-data/bronze/logs"
+RAW_LOGS_PATH = "/observability-data/loghub"  # LogHub data from notebook 00
 
 # Get parameters (set by job or use defaults)
 try:
@@ -54,40 +54,28 @@ raw_log_schema = StructType([
     StructField("message", StringType(), True),
     StructField("level", StringType(), True),
     StructField("service", StringType(), True),
-    StructField("serviceName", StringType(), True),  # OTel format
+    StructField("component", StringType(), True),
+    StructField("source", StringType(), True),              # LogHub dataset origin
+    StructField("source_service", StringType(), True),
+    StructField("target_service", StringType(), True),
+    StructField("endpoint", StringType(), True),
+    StructField("is_error", BooleanType(), True),
+    StructField("trace_id", StringType(), True),
     
-    # HTTP fields (nested)
+    # HTTP fields (nested — from LogHub observability enhancement)
     StructField("http", StructType([
         StructField("method", StringType(), True),
         StructField("path", StringType(), True),
-        StructField("route", StringType(), True),
         StructField("status_code", IntegerType(), True),
-        StructField("latency_ms", DoubleType(), True),
-        StructField("client_ip", StringType(), True),
-        StructField("user_agent", StringType(), True)
+        StructField("latency_ms", DoubleType(), True)
     ]), True),
     
-    # Trace context (nested)
-    StructField("trace", StructType([
-        StructField("trace_id", StringType(), True),
-        StructField("span_id", StringType(), True),
-        StructField("parent_span_id", StringType(), True)
-    ]), True),
-    
-    # Kubernetes metadata (nested)
+    # Kubernetes metadata (nested — from LogHub observability enhancement)
     StructField("kubernetes", StructType([
         StructField("cluster", StringType(), True),
         StructField("namespace", StringType(), True),
         StructField("pod", StringType(), True),
-        StructField("container", StringType(), True),
-        StructField("labels", MapType(StringType(), StringType()), True)
-    ]), True),
-    
-    # Business context (nested)
-    StructField("business", StructType([
-        StructField("user_id", StringType(), True),
-        StructField("order_id", StringType(), True),
-        StructField("payment_id", StringType(), True)
+        StructField("container", StringType(), True)
     ]), True),
     
     # Catch-all for other fields
@@ -101,8 +89,8 @@ raw_log_schema = StructType([
 
 # COMMAND ----------
 
-# Construct input path for specific date
-input_path = f"{RAW_LOGS_PATH}/{input_date}/*.jsonl"
+# Construct input path for LogHub enhanced JSONL files
+input_path = f"{RAW_LOGS_PATH}/*_enhanced.jsonl"
 
 print(f"Reading from: {input_path}")
 
@@ -142,7 +130,7 @@ if corrupt_count > 0:
     raw_df = raw_df.filter(F.col("_corrupt_record").isNull())
     
     # Option 2: Write to quarantine table for investigation
-    # corrupt_df.write.format("delta").mode("append").save("/mnt/observability/quarantine/logs")
+    # corrupt_df.write.format("delta").mode("append").save("/observability-data/quarantine/logs")
 
 # Check for missing timestamps
 null_timestamp_count = raw_df.filter(F.col("timestamp").isNull()).count()
@@ -192,8 +180,8 @@ print(f"Enriched {enriched_df.count():,} records with metadata")
 # Deduplicate based on unique identifier
 dedupe_df = enriched_df.dropDuplicates([
     "timestamp", 
-    "trace.trace_id", 
-    "trace.span_id"
+    "trace_id",
+    "message"
 ])
 
 deduped_count = dedupe_df.count()
@@ -330,7 +318,7 @@ for key, value in metrics.items():
     print(f"   {key}: {value}")
 
 # Write metrics to monitoring table (optional)
-# spark.createDataFrame([metrics]).write.format("delta").mode("append").save("/mnt/observability/metrics/bronze_ingestion")
+# spark.createDataFrame([metrics]).write.format("delta").mode("append").save("/observability-data/metrics/bronze_ingestion")
 
 # COMMAND ----------
 

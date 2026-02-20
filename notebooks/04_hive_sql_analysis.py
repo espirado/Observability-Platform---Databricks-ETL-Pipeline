@@ -25,9 +25,9 @@
 # COMMAND ----------
 
 # Configuration
-BRONZE_PATH = "/mnt/observability/bronze/logs"
-SILVER_PATH = "/mnt/observability/silver/events"
-GOLD_PATH = "/mnt/observability/gold/service_flow_edges"
+BRONZE_PATH = "/observability-data/bronze/logs"
+SILVER_PATH = "/observability-data/silver/events"
+GOLD_PATH = "/observability-data/gold/service_flow_edges"
 
 print("Creating Hive external tables...")
 
@@ -45,7 +45,7 @@ print("Creating Hive external tables...")
 # MAGIC -- Create external table pointing to Delta Bronze
 # MAGIC CREATE TABLE IF NOT EXISTS bronze_logs
 # MAGIC USING DELTA
-# MAGIC LOCATION '/mnt/observability/bronze/logs';
+# MAGIC LOCATION '/observability-data/bronze/logs';
 # MAGIC 
 # MAGIC -- Show table info
 # MAGIC DESCRIBE EXTENDED bronze_logs;
@@ -60,7 +60,7 @@ print("Creating Hive external tables...")
 # MAGIC %sql
 # MAGIC CREATE TABLE IF NOT EXISTS silver_events
 # MAGIC USING DELTA
-# MAGIC LOCATION '/mnt/observability/silver/events';
+# MAGIC LOCATION '/observability-data/silver/events';
 # MAGIC 
 # MAGIC -- Show partitioning
 # MAGIC SHOW PARTITIONS silver_events;
@@ -75,7 +75,7 @@ print("Creating Hive external tables...")
 # MAGIC %sql
 # MAGIC CREATE TABLE IF NOT EXISTS gold_service_flow
 # MAGIC USING DELTA
-# MAGIC LOCATION '/mnt/observability/gold/service_flow_edges';
+# MAGIC LOCATION '/observability-data/gold/service_flow_edges';
 # MAGIC 
 # MAGIC SELECT 'Created Hive tables successfully!' as status;
 

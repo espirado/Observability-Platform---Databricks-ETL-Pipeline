@@ -4,9 +4,9 @@
 # MAGIC
 # MAGIC **Purpose**: Parse and enrich Bronze logs into clean Silver events
 # MAGIC
-# MAGIC **Input**: Delta Bronze table (`/mnt/observability/bronze/logs`)
+# MAGIC **Input**: Delta Bronze table (`/observability-data/bronze/logs`)
 # MAGIC
-# MAGIC **Output**: Delta Silver table (`/mnt/observability/silver/events`)
+# MAGIC **Output**: Delta Silver table (`/observability-data/silver/events`)
 # MAGIC
 # MAGIC **Processing**:
 # MAGIC - Flatten nested JSON structures
@@ -23,9 +23,9 @@ from delta.tables import DeltaTable
 from datetime import datetime, timedelta
 
 # Configuration
-BRONZE_PATH = "/mnt/observability/bronze/logs"
-SILVER_PATH = "/mnt/observability/silver/events"
-METADATA_PATH = "/mnt/observability/metadata/services"
+BRONZE_PATH = "/observability-data/bronze/logs"
+SILVER_PATH = "/observability-data/silver/events"
+METADATA_PATH = "/observability-data/metadata/services"
 
 # Get processing date
 try:

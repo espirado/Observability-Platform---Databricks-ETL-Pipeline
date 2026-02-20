@@ -4,7 +4,7 @@
 # MAGIC 
 # MAGIC **Purpose**: Use Spark MLlib to detect anomalies in service flow patterns
 # MAGIC 
-# MAGIC **Input**: Gold service flow edges (`/mnt/observability/gold/service_flow_edges`)
+# MAGIC **Input**: Gold service flow edges (`/observability-data/gold/service_flow_edges`)
 # MAGIC 
 # MAGIC **Output**: 
 # MAGIC - Trained anomaly detection model
@@ -31,9 +31,9 @@ from pyspark.ml import Pipeline
 from datetime import datetime, timedelta
 
 # Configuration
-GOLD_PATH = "/mnt/observability/gold/service_flow_edges"
-MODEL_PATH = "/mnt/observability/models/anomaly_detector"
-ANOMALY_OUTPUT_PATH = "/mnt/observability/analytics/anomalies"
+GOLD_PATH = "/observability-data/gold/service_flow_edges"
+MODEL_PATH = "/observability-data/models/anomaly_detector"
+ANOMALY_OUTPUT_PATH = "/observability-data/analytics/anomalies"
 
 # Get processing date
 try:

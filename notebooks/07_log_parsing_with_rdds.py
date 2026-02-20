@@ -35,7 +35,7 @@ sc = spark.sparkContext
 
 # Configuration
 LOGHUB_PATH = "/dbfs/observability-data/loghub"
-OUTPUT_PATH = "/mnt/observability/rdd_parsed"
+OUTPUT_PATH = "/observability-data/rdd_parsed"
 
 # Get dataset
 try:

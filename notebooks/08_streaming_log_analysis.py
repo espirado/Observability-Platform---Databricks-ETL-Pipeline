@@ -32,9 +32,9 @@ from datetime import datetime, timedelta
 import json
 
 # Configuration
-STREAM_SOURCE_PATH = "/mnt/observability/streaming/input"
-STREAM_CHECKPOINT_PATH = "/mnt/observability/streaming/checkpoints"
-STREAM_OUTPUT_PATH = "/mnt/observability/streaming/output"
+STREAM_SOURCE_PATH = "/observability-data/streaming/input"
+STREAM_CHECKPOINT_PATH = "/observability-data/streaming/checkpoints"
+STREAM_OUTPUT_PATH = "/observability-data/streaming/output"
 
 # Create streaming input directory if it doesn't exist
 dbutils.fs.mkdirs(STREAM_SOURCE_PATH)

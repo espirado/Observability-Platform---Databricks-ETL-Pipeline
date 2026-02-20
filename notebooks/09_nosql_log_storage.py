@@ -35,9 +35,9 @@ from datetime import datetime, timedelta
 import hashlib
 
 # Configuration
-GOLD_PATH = "/mnt/observability/gold/service_flow_edges"
-ANOMALY_PATH = "/mnt/observability/analytics/anomalies"
-NOSQL_PATH = "/mnt/observability/nosql"
+GOLD_PATH = "/observability-data/gold/service_flow_edges"
+ANOMALY_PATH = "/observability-data/analytics/anomalies"
+NOSQL_PATH = "/observability-data/nosql"
 
 print("🗄️  NoSQL Storage with Delta Lake")
 print(f"   Output: {NOSQL_PATH}")
@@ -118,10 +118,6 @@ nosql_edges = (gold_df
 )
 
 print("✅ Row keys created (using native Spark SQL - no UDF serialization issues)")
-    .withColumn("row_key_hash", F.md5(F.col("row_key")))  # For bucketing
-)
-
-print("✅ Row keys created")
 print("\n📋 Sample row keys:")
 nosql_edges.select("row_key", "source_service", "target_service", "hour").show(5, truncate=False)
 
