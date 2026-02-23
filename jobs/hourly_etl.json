@@ -1,0 +1,116 @@
+{
+  "name": "Observability ETL - Hourly",
+  "email_notifications": {
+    "on_failure": ["oncall@example.com"],
+    "on_success": [],
+    "no_alert_for_skipped_runs": true
+  },
+  "timeout_seconds": 3600,
+  "max_concurrent_runs": 1,
+  "tasks": [
+    {
+      "task_key": "ingest_bronze",
+      "notebook_task": {
+        "notebook_path": "/Workspace/observability-etl/01_ingest_raw_logs",
+        "base_parameters": {
+          "input_date": "{{job.start_time.date}}"
+        }
+      },
+      "new_cluster": {
+        "spark_version": "13.3.x-scala2.12",
+        "node_type_id": "i3.xlarge",
+        "num_workers": 4,
+        "spark_conf": {
+          "spark.databricks.delta.optimizeWrite.enabled": "true",
+          "spark.databricks.delta.autoCompact.enabled": "true"
+        },
+        "aws_attributes": {
+          "availability": "SPOT_WITH_FALLBACK",
+          "zone_id": "us-east-1a",
+          "spot_bid_price_percent": 100,
+          "ebs_volume_type": "GENERAL_PURPOSE_SSD",
+          "ebs_volume_count": 1,
+          "ebs_volume_size": 100
+        }
+      },
+      "timeout_seconds": 1200,
+      "max_retries": 2,
+      "min_retry_interval_millis": 60000
+    },
+    {
+      "task_key": "enrich_silver",
+      "depends_on": [
+        {
+          "task_key": "ingest_bronze"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/Workspace/observability-etl/02_enrich_events",
+        "base_parameters": {
+          "input_date": "{{job.start_time.date}}"
+        }
+      },
+      "new_cluster": {
+        "spark_version": "13.3.x-scala2.12",
+        "node_type_id": "i3.xlarge",
+        "num_workers": 4,
+        "spark_conf": {
+          "spark.databricks.delta.optimizeWrite.enabled": "true",
+          "spark.databricks.delta.autoCompact.enabled": "true"
+        }
+      },
+      "timeout_seconds": 1800,
+      "max_retries": 2
+    },
+    {
+      "task_key": "build_flow_dataset",
+      "depends_on": [
+        {
+          "task_key": "enrich_silver"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/Workspace/observability-etl/03_build_flow_dataset",
+        "base_parameters": {
+          "input_date": "{{job.start_time.date}}"
+        }
+      },
+      "new_cluster": {
+        "spark_version": "13.3.x-scala2.12",
+        "node_type_id": "i3.xlarge",
+        "num_workers": 2,
+        "spark_conf": {
+          "spark.databricks.delta.optimizeWrite.enabled": "true"
+        }
+      },
+      "timeout_seconds": 1200,
+      "max_retries": 1
+    },
+    {
+      "task_key": "sync_to_clickhouse",
+      "depends_on": [
+        {
+          "task_key": "build_flow_dataset"
+        }
+      ],
+      "notebook_task": {
+        "notebook_path": "/Workspace/observability-etl/06_sync_to_clickhouse",
+        "base_parameters": {
+          "input_date": "{{job.start_time.date}}",
+          "datasets": "service_flow_edges"
+        }
+      },
+      "existing_cluster_id": "{{secrets/observability/cluster_id}}",
+      "timeout_seconds": 600,
+      "max_retries": 3,
+      "min_retry_interval_millis": 30000
+    }
+  ],
+  "schedule": {
+    "quartz_cron_expression": "0 0 * * * ?",
+    "timezone_id": "UTC",
+    "pause_status": "UNPAUSED"
+  },
+  "format": "MULTI_TASK"
+}
+
